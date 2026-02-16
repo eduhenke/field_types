@@ -94,15 +94,13 @@ extern crate syn;
 extern crate quote;
 extern crate heck;
 
-use std::iter::FromIterator;
 use proc_macro::TokenStream;
+use proc_macro2::{Span, TokenStream as TokenStream2};
 use syn::{
-    DeriveInput, Ident, Type, Attribute, Fields, Meta, Path, PathArguments, PathSegment,
-    export::{Span, TokenStream2},
-    punctuated::Punctuated,
+    DeriveInput, Ident, Type, Attribute, Fields, Meta,
 };
 use quote::{quote, ToTokens};
-use heck::CamelCase;
+use heck::ToUpperCamelCase;
 
 #[proc_macro_derive(FieldType, attributes(field_types, field_type, field_types_derive, field_type_derive))]
 pub fn field_type(input: TokenStream) -> TokenStream {
@@ -298,35 +296,18 @@ pub fn field_name(input: TokenStream) -> TokenStream {
 
 fn get_enum_derive(attrs: &[Attribute], derive_attr_names: &[&str], default: TokenStream2) -> TokenStream2 {
     attrs.iter()
-        .filter_map(|attr| attr.parse_meta()
-            .ok()
-            .and_then(|meta| {
-                for attr_name in derive_attr_names {
-                    let attr_ident = Some(Ident::new(attr_name, Span::call_site()));
-                    let ident = meta.path().get_ident();
-                    if ident == attr_ident.as_ref() {
-                        if let Meta::List(meta_list) = &meta {
-                            let mut meta_list = meta_list.clone();
-                            meta_list.path = Path {
-                                leading_colon: None,
-                                segments: {
-                                    let mut segments = Punctuated::new();
-                                    segments.push(PathSegment {
-                                        ident: Ident::new("derive", Span::call_site()),
-                                        arguments: PathArguments::None,
-                                    });
-                                    segments
-                                }
-                            };
-                            return Some(meta_list);
-                        }
+        .filter_map(|attr| {
+            for attr_name in derive_attr_names {
+                if attr.path().is_ident(attr_name) {
+                    if let Meta::List(meta_list) = &attr.meta {
+                        let tokens = &meta_list.tokens;
+                        return Some(quote! { #[derive(#tokens)] });
                     }
                 }
-                None
-            })
-        )
+            }
+            None
+        })
         .next()
-        .map(|meta_list| quote! { #[#meta_list] })
         .unwrap_or(default)
 }
 
@@ -340,7 +321,7 @@ fn filter_fields(fields: &Fields, skip_attr_name: &str) -> Vec<(Ident, Type, Ide
                 let field_ty = field.ty.clone();
                 let field_ident = field.ident.as_ref().unwrap().clone();
                 let field_name = field.ident.as_ref().unwrap().to_string();
-                let variant_ident = Ident::new(&field_name.to_camel_case(), Span::call_site());
+                let variant_ident = Ident::new(&field_name.to_upper_camel_case(), Span::call_site());
                 Some((field_ident, field_ty, variant_ident))
             } else {
                 None
@@ -350,36 +331,23 @@ fn filter_fields(fields: &Fields, skip_attr_name: &str) -> Vec<(Ident, Type, Ide
 }
 
 fn has_skip_attr(attr: &Attribute, attr_names: &[&str]) -> bool {
-    attr.parse_meta()
-        .ok()
-        .and_then(|meta| {
-            for attr_name in attr_names {
-                let attr_ident = Some(Ident::new(attr_name, Span::call_site()));
-                let ident = meta.path().get_ident();
-                if ident == attr_ident.as_ref() {
-                    return Some(meta);
+    for attr_name in attr_names {
+        if attr.path().is_ident(attr_name) {
+            let value = match &attr.meta {
+                Meta::List(list) => {
+                    list.tokens.to_string()
                 }
-            }
-            None
-        })
-        .map(|meta| {
-            let value = match meta {
-                Meta::List(ref list) => list.nested.first()
-                    .expect("Attribute value can't be empty")
-                    .clone()
-                    .into_token_stream()
-                    .to_string(),
-
-                Meta::NameValue(ref name_value) => name_value.lit
-                    .clone()
-                    .into_token_stream()
-                    .to_string(),
-
+                Meta::NameValue(name_value) => {
+                    name_value.value.to_token_stream().to_string()
+                }
                 _ => panic!("Unknown attribute value, only `skip` allowed."),
             };
-            if value != "skip" && value.find("\"skip\"").is_none() {
+
+            if value != "skip" && !value.contains("skip") {
                 panic!("Unknown attribute value `{}`, only `skip` allowed.", value);
             }
-        })
-        .is_some()
+            return true;
+        }
+    }
+    false
 }
