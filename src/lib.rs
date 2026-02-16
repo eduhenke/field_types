@@ -89,57 +89,62 @@ field_types = "*"
 Use `FieldName` and/or `FieldType` in `derive` struct attribute.
 !*/
 
-extern crate proc_macro;
-extern crate syn;
-extern crate quote;
 extern crate heck;
+extern crate proc_macro;
+extern crate quote;
+extern crate syn;
 
+use heck::ToUpperCamelCase;
 use proc_macro::TokenStream;
 use proc_macro2::{Span, TokenStream as TokenStream2};
-use syn::{
-    DeriveInput, Ident, Type, Attribute, Fields, Meta,
-};
 use quote::{quote, ToTokens};
-use heck::ToUpperCamelCase;
+use syn::{Attribute, DeriveInput, Fields, Ident, Meta, Type};
 
-#[proc_macro_derive(FieldType, attributes(field_types, field_type, field_types_derive, field_type_derive))]
+#[proc_macro_derive(
+    FieldType,
+    attributes(field_types, field_type, field_types_derive, field_type_derive)
+)]
 pub fn field_type(input: TokenStream) -> TokenStream {
     let ast: DeriveInput = syn::parse(input).unwrap();
     let (vis, ty, generics) = (&ast.vis, &ast.ident, &ast.generics);
     let enum_ty = Ident::new(&(ty.to_string() + "FieldType"), Span::call_site());
-    let derive = get_enum_derive(&ast.attrs, &["field_types_derive", "field_type_derive"], quote! {});
+    let derive = get_enum_derive(
+        &ast.attrs,
+        &["field_types_derive", "field_type_derive"],
+        quote! {},
+    );
 
-    let fields = filter_fields(match ast.data {
-        syn::Data::Struct(ref s) => &s.fields,
-        _ => panic!("FieldType can only be derived for structures"),
-    }, "field_type");
+    let fields = filter_fields(
+        match ast.data {
+            syn::Data::Struct(ref s) => &s.fields,
+            _ => panic!("FieldType can only be derived for structures"),
+        },
+        "field_type",
+    );
 
     if fields.is_empty() {
         panic!("FieldType can only be derived for non-empty structures");
     }
 
-    let field_type_variants = fields.iter()
-        .map(|(_, field_ty, variant_ident)| {
-            quote! {
-                #variant_ident(#field_ty)
-            }
-        });
+    let field_type_variants = fields.iter().map(|(_, field_ty, variant_ident)| {
+        quote! {
+            #variant_ident(#field_ty)
+        }
+    });
 
-    let field_type_constructs = fields.iter()
-        .map(|(field_ident, _, variant_ident)| {
-            quote! {
-                #enum_ty::#variant_ident(#field_ident)
-            }
-        });
+    let field_type_constructs = fields.iter().map(|(field_ident, _, variant_ident)| {
+        quote! {
+            #enum_ty::#variant_ident(#field_ident)
+        }
+    });
 
     let from_field_type_constructs = field_type_constructs.clone();
 
-    let fields_idents = fields.iter()
-        .map(|(field_ident, _, _)| {
-            quote! {
-                #field_ident
-            }
-        });
+    let fields_idents = fields.iter().map(|(field_ident, _, _)| {
+        quote! {
+            #field_ident
+        }
+    });
 
     let destructuring = quote! { #ty { #(#fields_idents,)* .. } };
 
@@ -191,51 +196,56 @@ pub fn field_type(input: TokenStream) -> TokenStream {
     tokens.into()
 }
 
-#[proc_macro_derive(FieldName, attributes(field_types, field_name, field_types_derive, field_name_derive))]
+#[proc_macro_derive(
+    FieldName,
+    attributes(field_types, field_name, field_types_derive, field_name_derive)
+)]
 pub fn field_name(input: TokenStream) -> TokenStream {
     let ast: DeriveInput = syn::parse(input).unwrap();
     let (vis, ty, generics) = (&ast.vis, &ast.ident, &ast.generics);
     let enum_ty = Ident::new(&(ty.to_string() + "FieldName"), Span::call_site());
-    let derive = get_enum_derive(&ast.attrs, &["field_types_derive", "field_name_derive"],
-                            quote! { #[derive(Debug, PartialEq, Eq, Clone, Copy)] });
+    let derive = get_enum_derive(
+        &ast.attrs,
+        &["field_types_derive", "field_name_derive"],
+        quote! { #[derive(Debug, PartialEq, Eq, Clone, Copy)] },
+    );
 
-    let fields = filter_fields(match ast.data {
-        syn::Data::Struct(ref s) => &s.fields,
-        _ => panic!("FieldName can only be derived for structures"),
-    }, "field_name");
+    let fields = filter_fields(
+        match ast.data {
+            syn::Data::Struct(ref s) => &s.fields,
+            _ => panic!("FieldName can only be derived for structures"),
+        },
+        "field_name",
+    );
 
     if fields.is_empty() {
         panic!("FieldName can only be derived for non-empty structures");
     }
 
-    let field_name_variants = fields.iter()
-        .map(|(_, _, variant_ident)| {
-            quote! {
-                #variant_ident
-            }
-        });
+    let field_name_variants = fields.iter().map(|(_, _, variant_ident)| {
+        quote! {
+            #variant_ident
+        }
+    });
 
-    let field_name_to_strs = fields.iter()
-        .map(|(field_ident, _, variant_ident)| {
-            let field_name = field_ident.to_string();
-            quote! {
-                #enum_ty::#variant_ident => #field_name
-            }
-        });
+    let field_name_to_strs = fields.iter().map(|(field_ident, _, variant_ident)| {
+        let field_name = field_ident.to_string();
+        quote! {
+            #enum_ty::#variant_ident => #field_name
+        }
+    });
 
-    let field_name_by_strs = fields.iter()
-        .map(|(_, _, variant_ident)| {
-            quote! {
-                if #enum_ty::#variant_ident.name() == name { return Some(#enum_ty::#variant_ident) }
-            }
-        });
+    let field_name_by_strs = fields.iter().map(|(_, _, variant_ident)| {
+        quote! {
+            if #enum_ty::#variant_ident.name() == name { return Some(#enum_ty::#variant_ident) }
+        }
+    });
 
-    let field_name_constructs = fields.iter()
-        .map(|(_, _, variant_ident)| {
-            quote! {
-                #enum_ty::#variant_ident
-            }
-        });
+    let field_name_constructs = fields.iter().map(|(_, _, variant_ident)| {
+        quote! {
+            #enum_ty::#variant_ident
+        }
+    });
 
     let from_field_name_constructs = field_name_constructs.clone();
 
@@ -294,8 +304,13 @@ pub fn field_name(input: TokenStream) -> TokenStream {
     tokens.into()
 }
 
-fn get_enum_derive(attrs: &[Attribute], derive_attr_names: &[&str], default: TokenStream2) -> TokenStream2 {
-    attrs.iter()
+fn get_enum_derive(
+    attrs: &[Attribute],
+    derive_attr_names: &[&str],
+    default: TokenStream2,
+) -> TokenStream2 {
+    attrs
+        .iter()
         .filter_map(|attr| {
             for attr_name in derive_attr_names {
                 if attr.path().is_ident(attr_name) {
@@ -312,16 +327,21 @@ fn get_enum_derive(attrs: &[Attribute], derive_attr_names: &[&str], default: Tok
 }
 
 fn filter_fields(fields: &Fields, skip_attr_name: &str) -> Vec<(Ident, Type, Ident)> {
-    fields.iter()
+    fields
+        .iter()
         .filter_map(|field| {
-            if field.attrs.iter()
+            if field
+                .attrs
+                .iter()
                 .find(|attr| has_skip_attr(attr, &["field_types", skip_attr_name]))
-                .is_none() && field.ident.is_some()
+                .is_none()
+                && field.ident.is_some()
             {
                 let field_ty = field.ty.clone();
                 let field_ident = field.ident.as_ref().unwrap().clone();
                 let field_name = field.ident.as_ref().unwrap().to_string();
-                let variant_ident = Ident::new(&field_name.to_upper_camel_case(), Span::call_site());
+                let variant_ident =
+                    Ident::new(&field_name.to_upper_camel_case(), Span::call_site());
                 Some((field_ident, field_ty, variant_ident))
             } else {
                 None
@@ -334,12 +354,8 @@ fn has_skip_attr(attr: &Attribute, attr_names: &[&str]) -> bool {
     for attr_name in attr_names {
         if attr.path().is_ident(attr_name) {
             let value = match &attr.meta {
-                Meta::List(list) => {
-                    list.tokens.to_string()
-                }
-                Meta::NameValue(name_value) => {
-                    name_value.value.to_token_stream().to_string()
-                }
+                Meta::List(list) => list.tokens.to_string(),
+                Meta::NameValue(name_value) => name_value.value.to_token_stream().to_string(),
                 _ => panic!("Unknown attribute value, only `skip` allowed."),
             };
 

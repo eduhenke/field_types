@@ -1,10 +1,10 @@
 #![allow(dead_code)]
 
-extern crate variant_count;
 extern crate field_types;
+extern crate variant_count;
 
-use variant_count::VariantCount;
 use field_types::FieldType;
+use variant_count::VariantCount;
 
 #[derive(FieldType)]
 struct Test {
@@ -19,7 +19,8 @@ struct Test {
 #[derive(FieldType)]
 #[field_type_derive(VariantCount, Debug, Clone, PartialEq)]
 struct TestGen<'a, T: 'a, U>
-    where U: 'a
+where
+    U: 'a,
 {
     first: T,
     second_field: Option<&'a U>,
@@ -123,9 +124,11 @@ fn into_field_type() {
         third: &2,
         fourth: message.clone(),
     };
-    let fields: [TestGenFieldType<i32, String>; TestGenFieldType::<i32, String>::VARIANT_COUNT] = test.into();
+    let fields: [TestGenFieldType<i32, String>; TestGenFieldType::<i32, String>::VARIANT_COUNT] =
+        test.into();
     assert!(match fields {
-        [TestGenFieldType::First(1), TestGenFieldType::SecondField(Some(s))] if s == &message => true,
+        [TestGenFieldType::First(1), TestGenFieldType::SecondField(Some(s))] if s == &message =>
+            true,
         _ => false,
     });
 

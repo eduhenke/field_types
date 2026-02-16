@@ -1,10 +1,10 @@
 #![allow(dead_code)]
 
-extern crate variant_count;
 extern crate field_types;
+extern crate variant_count;
 
-use variant_count::VariantCount;
 use field_types::FieldName;
+use variant_count::VariantCount;
 
 #[derive(FieldName)]
 struct Test {
@@ -19,7 +19,8 @@ struct Test {
 #[derive(FieldName)]
 #[field_name_derive(VariantCount, Debug, Clone, PartialEq)]
 struct TestGen<'a, T: 'a, U>
-    where U: 'a
+where
+    U: 'a,
 {
     first: T,
     second_field: Option<&'a U>,
@@ -37,7 +38,7 @@ struct TestTypesDerive {
 }
 
 #[derive(FieldName)]
-#[field_name_derive(VariantCount, Debug, Clone, PartialEq)]
+#[field_name_derive(VariantCount, Debug, Clone, PartialEq, Hash)]
 struct TestNameDerive {
     first: i32,
     second: bool,
@@ -124,7 +125,8 @@ fn into_field_name() {
         first: 1,
         second: true,
     };
-    let fields: [TestTypesDeriveFieldName; TestTypesDeriveFieldName::VARIANT_COUNT] = (&test).into();
+    let fields: [TestTypesDeriveFieldName; TestTypesDeriveFieldName::VARIANT_COUNT] =
+        (&test).into();
     assert_eq!(TestTypesDeriveFieldName::First, fields[0]);
     assert_eq!(TestTypesDeriveFieldName::Second, fields[1]);
 }
@@ -135,6 +137,9 @@ fn field_name_str() {
     assert_eq!(TestFieldName::SecondField.name(), "second_field");
 
     assert_eq!(Some(TestFieldName::First), TestFieldName::by_name("first"));
-    assert_eq!(Some(TestFieldName::SecondField), TestFieldName::by_name("second_field"));
+    assert_eq!(
+        Some(TestFieldName::SecondField),
+        TestFieldName::by_name("second_field")
+    );
     assert_eq!(None, TestFieldName::by_name("third"));
 }
