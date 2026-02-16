@@ -207,7 +207,7 @@ pub fn field_name(input: TokenStream) -> TokenStream {
     let derive = get_enum_derive(
         &ast.attrs,
         &["field_types_derive", "field_name_derive"],
-        quote! { #[derive(Debug, PartialEq, Eq, Clone, Copy)] },
+        quote! { #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)] },
     );
 
     let fields = filter_fields(
